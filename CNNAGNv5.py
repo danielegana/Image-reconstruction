@@ -18,7 +18,6 @@ from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn import tree
 from sklearn import ensemble
-
 import torch.nn.init as init
 import re
 import os
@@ -45,7 +44,7 @@ if __name__ == '__main__':
     os.chdir(pythondir)
     print("lala")
     #%%
-    lendata=1000
+    lendata=5000
     inclination = np.random.uniform(0, np.pi/2, lendata)
     R0 = np.random.uniform(6, 100, lendata)
 
@@ -82,6 +81,13 @@ if __name__ == '__main__':
     def imagenumber(imagefile):
         return int(re.findall(r'\d+', imagefile)[0])
 
+    device = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps"
+    if torch.backends.mps.is_available()
+    else "cpu")
+    print(f"Using {device} device")
     class ImageDataset(Dataset):
         def __init__(self, root_dir):
             self.root_dir = root_dir
@@ -98,7 +104,7 @@ if __name__ == '__main__':
             param_name=os.path.join(self.root_dir,"inputs" , self.params[idx])
             params = np.genfromtxt(param_name,delimiter=" ")
             # Convert image to tensor and normalize
-            feature = torch.tensor(image, dtype=torch.float) 
+            feature = torch.unsqueeze(torch.tensor(image, dtype=torch.float),0)
             label = torch.tensor(params, dtype=torch.float)
             return feature,label
         
@@ -118,7 +124,7 @@ if __name__ == '__main__':
             param_name=os.path.join(self.root_dir,"inputs" , self.params[idx])
             params = np.genfromtxt(param_name,delimiter=" ")
             # Convert image to tensor and normalize
-            feature = torch.tensor(image, dtype=torch.float) 
+            feature = torch.unsqueeze(torch.tensor(image, dtype=torch.float),0)
             label = torch.tensor(params, dtype=torch.float)
             return feature,label
     #%%
@@ -132,31 +138,39 @@ if __name__ == '__main__':
             super(mynet, self).__init__()
             # 1 input image channel (black & white), 4 output channels, 5x5 square convolution
             # kernel
+            npixx=64
+            prepaddingy=3
+            npixy=(npixx/2+1)+prepaddingy
+            numparams=2
             filter1=50
             filter2=100
             filter3=200
-            kernel1=int(50)
-            kernel2=int(30)
-            kernel3=int(10)
+            kernel1=int(21)
+            kernel2=int(11)
+            kernel3=int(5)
             padding1=(kernel1-1)/2
             padding2=(kernel2-1)/2
             padding3=(kernel3-1)/2
-            finalpixel=int(((28-(kernel1-1)+2*padding1)/2-(kernel2-1)+2*padding2)/2-(kernel3-1)+2*padding3)
+            finalpixelx=int(((npixx-(kernel1-1)+2*padding1)/2-(kernel2-1)+2*padding2)/2-(kernel3-1)+2*padding3)
+            finalpixely=int(((npixy-(kernel1-1)+2*padding1)/2-(kernel2-1)+2*padding2)/2-(kernel3-1)+2*padding3)
+            self.padding_layer = nn.ZeroPad2d((0, 0, 0, prepaddingy))
             self.conv1 = nn.Conv2d(1, filter1, kernel1, padding=int(padding1))
             self.conv2 = nn.Conv2d(filter1, filter2, kernel2,padding=int(padding2))
             self.conv3 = nn.Conv2d(filter2, filter3, kernel3,padding=int(padding3))
-            self.fc1 = nn.Linear(filter3*finalpixel*finalpixel,100)  # 5*5 from image dimension
-            self.fc2 = nn.Linear(100, 10)
-            self.dropout = nn.Dropout(p=0.2)
+            self.fc1 = nn.Linear(filter3*finalpixelx*finalpixely,1000) 
+            self.fc2 = nn.Linear(1000, numparams)
+            self.dropout = nn.Dropout(p=0)
+            self.bn0 = nn.BatchNorm2d(1)
             self.bn1 = nn.BatchNorm2d(filter1)
             self.bn2 = nn.BatchNorm2d(filter2)
             self.bn3 = nn.BatchNorm2d(filter3)
-            self.bnf1 = nn.BatchNorm1d(100)
-            self.bnf2 = nn.BatchNorm1d(10)
+            self.bnf1 = nn.BatchNorm1d(1000)
+            self.bnf2 = nn.BatchNorm1d(numparams)
 
         def forward(self, x):
             # Max pooling over a (2, 2) window
-            x = F.max_pool2d(F.relu(self.bn1(self.conv1(x))), (2, 2))
+            x=F.pad(x,(0,3),"constant",0)
+            x = F.max_pool2d(F.relu(self.bn1(self.conv1(self.bn0(x)))), (2, 2))
             x=self.dropout(x)
             x = F.max_pool2d(F.relu(self.bn2(self.conv2(x))), (2, 2))
             x = F.relu(self.bn3(self.conv3(x)))
@@ -218,13 +232,10 @@ if __name__ == '__main__':
         correct /= size
         print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
         return correct
+    #%%
+    model = mynet().to(device)
 
-
-
-
-
-
-
+    # %%
     agndatavis=visDataset(filedir)
     agndataint=ImageDataset(filedir)
     visflag=1
@@ -242,12 +253,44 @@ if __name__ == '__main__':
     train_dataset = Subset(agndata, range(0,train_size))
     test_dataset = Subset(agndata, range(train_size,len(agndata)))
 
+    test_images,test_labels=[x for x, y in test_dataset], [y for x, y in test_dataset]
+    test_images=torch.stack([matrix for matrix in  test_images]).to(device)
+    test_labels=torch.stack([matrix for matrix in  test_labels]).to(device)
 
-    batch_size=20
-    train_loader = DataLoader(train_dataset, batch_size=len(train_dataset), shuffle=True)
 
 
+   
+    #%% CNN training
+    batch=100
+    epochs=20
+    train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch, shuffle=False)
+    loss_fn = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)    
+    for t in range(epochs):
+        print(f"Epoch {t+1}\n-------------------------------")
+        train(train_loader, model, loss_fn, optimizer)    
+        print("Done!")
+
+  # %% Compute the mse for the test images
+    y_pred = model(test_images)
+    frac_error=model(test_images)/test_labels
+    mse = F.mse_loss(test_labels, y_pred)
+    print("MSE DT: ",mse)
+    #print("Target labels: ",test_labels)
+    print("Fractional Error: ",frac_error)
+
+    #%% Benchmark is the average inclination
+
+    y_pred =  torch.tensor([0.5,0.5]).unsqueeze(0).repeat(len(test_labels),1).to(device)
+    mse = F.mse_loss(test_labels, y_pred)
+    print("MSE Benchmark: ",mse)
+
+
+
+#################################################################
     #%%
+    #%% Data preparation for DT
     train_images,train_labels=[torch.squeeze(x.view(x.size(0)*x.size(1), -1),1).numpy() for x, y in train_dataset], [y for x, y in train_dataset]
     train_images=np.stack(train_images)
     train_labels=np.stack(train_labels)
@@ -263,13 +306,7 @@ if __name__ == '__main__':
     model=ensemble.RandomForestRegressor()
     model.fit(train_images,train_labels)
 
-    #%% Benchmark is the average inclination
-
-    y_pred = np.tile([0.5,0.5], (len(test_labels), 1))
-    mse = mean_squared_error(test_labels, y_pred)
-    print("MSE Benchmark: ",mse)
-
-
+ 
     # %% Now compute the mse for the test images
     y_pred = model.predict(test_images)
     frac_error=np.divide(model.predict(test_images),test_labels)
