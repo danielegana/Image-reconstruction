@@ -90,45 +90,7 @@ if __name__ == '__main__':
     if torch.backends.mps.is_available()
     else "cpu")
     print(f"Using {device} device")
-    class ImageDataset(Dataset):
-        def __init__(self, root_dir):
-            self.root_dir = root_dir
-            self.images = sorted([img for img in os.listdir(root_dir+"/outputint") if not img.startswith('.')],key=imagenumber)
-            self.params = sorted([params for params in os.listdir(root_dir+"/inputs") if not params.startswith('.')],key=imagenumber)
-        
-        def __len__(self):
-            return len(self.images)
-        
-
-        def __getitem__(self, idx):
-            image_name = os.path.join(self.root_dir,"outputint" ,self.images[idx])
-            image = np.genfromtxt(image_name,delimiter=" ")
-            param_name=os.path.join(self.root_dir,"inputs" , self.params[idx])
-            params = np.genfromtxt(param_name,delimiter=" ")
-            # Convert image to tensor and normalize
-            feature = torch.unsqueeze(torch.tensor(image, dtype=torch.float),0).to(device)
-            label = torch.tensor(params, dtype=torch.float).to(device)
-            return feature,label
-        
-    class visDataset(Dataset):
-        def __init__(self, root_dir):
-            self.root_dir = root_dir
-            self.images = sorted([img for img in os.listdir(root_dir+"/outputvis") if not img.startswith('.')],key=imagenumber)
-            self.params = sorted([params for params in os.listdir(root_dir+"/inputs") if not params.startswith('.')],key=imagenumber)
-        
-        def __len__(self):
-            return len(self.images)
-        
-
-        def __getitem__(self, idx):
-            image_name = os.path.join(self.root_dir,"outputvis" ,self.images[idx])
-            image = np.genfromtxt(image_name,delimiter=" ")
-            param_name=os.path.join(self.root_dir,"inputs" , self.params[idx])
-            params = np.genfromtxt(param_name,delimiter=" ")
-            # Convert image to tensor and normalize
-            feature = torch.unsqueeze(torch.tensor(image, dtype=torch.float),0).to(device)
-            label = torch.tensor(params, dtype=torch.float).to(device)
-            return feature,label
+ 
     #%%
 
     class getDataset(Dataset):
