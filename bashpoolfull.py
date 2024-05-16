@@ -9,7 +9,7 @@ def testfun(x,y):
 def find_number(arr, target):
     return target in arr
 
-def bashfun(run,tuple,selecttuples):
+def bashfun(run,tuple,selecttuples,clusterc):
         Rgit=tuple[0]
         Rinit=tuple[1]
         R0it=tuple[2]
@@ -17,7 +17,7 @@ def bashfun(run,tuple,selecttuples):
         inclinationit=tuple[4]
         posangleit=tuple[5]
         numpix=int(tuple[6])
-        bashcommand="./ssdisk"+" -run "+str(run)+" -Rmax "+str(150)+" -np "+str(numpix)
+        bashcommand="./ssdisk"+" -run "+str(run)+" -Rmax "+str(150)+" -np "+str(numpix)+" -cluster "+str(int(clusterc))
         if find_number(selecttuples, 0):
             bashcommand=bashcommand+" -Rg "+str(Rgit)
         if find_number(selecttuples, 1):

@@ -37,6 +37,7 @@ if __name__ == '__main__':
     clusterrun="false"
 
     if clusterrun == "false":
+        clusterc=int(0)
         pythondir="/Users/danielegana/Dropbox (PI)/ML/code/AGN/"
         filedir="/Users/danielegana/files/"
         binarydir="/Users/danielegana/Dropbox (PI)/ML/code/agndisk/agndisk/"
@@ -44,6 +45,7 @@ if __name__ == '__main__':
 
 
     if clusterrun == "true":
+        clusterc=int(1)
         pythondir="/home/degana/agn/AGN/"
         filedir="/home/degana/agn/files/"
         binarydir="/home/degana/agn/"
@@ -53,7 +55,7 @@ if __name__ == '__main__':
 
     print("Defining parameters")
 
-    lendata=30000
+    lendata=100
     numpix=int(32)
     numpixarray=[numpix]*lendata
     numparamvis=int(numpix*(numpix/2+1))
@@ -121,7 +123,7 @@ if __name__ == '__main__':
          #   file.write(str(Rgit/Rmax)+" "+str(Rinit/Rmax)+" "+str(R0it/Rmax)+" "+str(slopeit)+" "+str(inclinationit)+" "+str(posangleit) + '\n')
     #
     tuplelist=list(enumerate(paramtuples))
-    tuplelist= [(tup[0], tup[1], selecttuples) for tup in tuplelist]
+    tuplelist= [(tup[0], tup[1], selecttuples, clusterc) for tup in tuplelist]
     #%% Run C pool
 
     num_processes = multiprocessing.cpu_count()  # Number of available CPU cores
