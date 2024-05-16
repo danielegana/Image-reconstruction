@@ -74,12 +74,16 @@ if __name__ == '__main__':
     argdir="outputarg"
     os.chdir(binarydir)
     directorylist=[filedir+"inputs",filedir+intdir,filedir+visdir,filedir+argdir]
+
+    print("Creating directories")
+    for x in directorylist:
+            os.makedirs(x, exist_ok=True)
     
     if clusterrun == "false":
         print("Erasing folder contents:")
         #%%
         for x in directorylist:
-            os.makedirs(x, exist_ok=True)
+        #    os.makedirs(x, exist_ok=True)
             files = os.listdir(x)
             for file in files:
                 file_path = os.path.join(x, file)
