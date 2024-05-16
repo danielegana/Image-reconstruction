@@ -41,12 +41,15 @@ if __name__ == '__main__':
 
 
     if clusterrun == "true":
-        pythondir="/home/degana/agn/AGN"
+        pythondir="/home/degana/agn/AGN/"
         filedir="/home/degana/agn/files/"
-        binarydir="/home/degana/agn"
+        binarydir="/home/degana/agn/"
 
     os.chdir(pythondir)
     #%%
+
+    print("Defining parameters")
+
     lendata=100
     numpix=int(32)
     numpixarray=[numpix]*lendata
@@ -71,6 +74,7 @@ if __name__ == '__main__':
     argdir="outputarg"
     os.chdir(binarydir)
     directorylist=[filedir+"inputs",filedir+intdir,filedir+visdir,filedir+argdir]
+    print("Erasing folder contents:")
     #%%
     for x in directorylist:
         os.makedirs(x, exist_ok=True)
