@@ -24,6 +24,7 @@ from itertools import starmap
 import subprocess
 from itertools import chain
 import bashpoolfull
+import time
 
 
 #%%
@@ -31,7 +32,7 @@ import bashpoolfull
 # Test func pool function
 if __name__ == '__main__':
 
-    clusterrun="true"
+    clusterrun="True"
 
     if clusterrun == "false":
         pythondir="/Users/danielegana/Dropbox (PI)/ML/code/AGN/"
@@ -50,7 +51,7 @@ if __name__ == '__main__':
 
     print("Defining parameters")
 
-    lendata=100
+    lendata=50000
     numpix=int(32)
     numpixarray=[numpix]*lendata
     numparamvis=int(numpix*(numpix/2+1))
@@ -463,12 +464,14 @@ if __name__ == '__main__':
 
         ### A DT
         # %%
-        modelDT=ensemble.RandomForestRegressor()
+        modelDT=ensemble.RandomForestRegressor(n_jobs=-1)
         #modelDT=ensemble.BaggingRegressor()
     # modelDT=tree.DecisionTreeRegressor(min_samples_split=10,min_samples_leaf=10)
 
-
+        start_time = time.time()
         modelDT.fit(train_imagesDT,train_labelsDT)
+        end_time = time.time()
+        print("Time DT: ",end_time - start_time)
 
     
         # %% Now compute the mse for the test images
