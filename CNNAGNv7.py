@@ -22,7 +22,6 @@ from multiprocessing import Pool
 from multiprocessing import Process
 from itertools import starmap
 import subprocess
-from helpers import plot
 from itertools import chain
 import bashpoolfull
 
@@ -32,12 +31,14 @@ import bashpoolfull
 # Test func pool function
 if __name__ == '__main__':
 
-    clusterrun="false"
+    clusterrun="true"
 
     if clusterrun == "false":
         pythondir="/Users/danielegana/Dropbox (PI)/ML/code/AGN/"
         filedir="/Users/danielegana/files/"
         binarydir="/Users/danielegana/Dropbox (PI)/ML/code/agndisk/agndisk/"
+        from helpers import plot
+
 
     if clusterrun == "true":
         pythondir="/home/degana/agn/AGN"
