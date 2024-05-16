@@ -120,9 +120,10 @@ if __name__ == '__main__':
     tuplelist=list(enumerate(paramtuples))
     tuplelist= [(tup[0], tup[1], selecttuples) for tup in tuplelist]
     #%% Run C pool
-    print("Start C pool")
 
     num_processes = multiprocessing.cpu_count()  # Number of available CPU cores
+    print("Start C pool on "+str(num_processes)+" cores")
+
     with multiprocessing.Pool(processes=num_processes) as pool:
         printout = pool.starmap(bashpoolfull.bashfun,tuplelist)
     #%%
