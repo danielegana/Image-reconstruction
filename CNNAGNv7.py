@@ -87,6 +87,7 @@ if __name__ == '__main__':
     #with multiprocessing.Pool(processes=num_processes) as pool:
     #    printout = pool.starmap(bashpool.testfun, paramtuples)
     #%%
+    print("Create input files:")
         
     for x,(Rgit, Rinit,R0it, slopeit, inclinationit, posangleit, numpixit), in enumerate(paramtuples):
         with open(filedir+"inputs/input" + str(x), 'w') as file:
@@ -112,6 +113,8 @@ if __name__ == '__main__':
     tuplelist=list(enumerate(paramtuples))
     tuplelist= [(tup[0], tup[1], selecttuples) for tup in tuplelist]
     #%% Run C pool
+    print("Start C pool")
+
     num_processes = multiprocessing.cpu_count()  # Number of available CPU cores
     with multiprocessing.Pool(processes=num_processes) as pool:
         printout = pool.starmap(bashpoolfull.bashfun,tuplelist)
@@ -128,7 +131,7 @@ if __name__ == '__main__':
     else "mps"
     if torch.backends.mps.is_available()
     else "cpu")
-    print(f"Using {device} device")
+    print(f"Finished C pool. Using {device} device")
  
     #%%
 
