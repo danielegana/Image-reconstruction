@@ -74,21 +74,23 @@ if __name__ == '__main__':
     argdir="outputarg"
     os.chdir(binarydir)
     directorylist=[filedir+"inputs",filedir+intdir,filedir+visdir,filedir+argdir]
-    print("Erasing folder contents:")
-    #%%
-    for x in directorylist:
-        os.makedirs(x, exist_ok=True)
-        files = os.listdir(x)
-        for file in files:
-            file_path = os.path.join(x, file)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
+    
+    if clusterrun == "false":
+        print("Erasing folder contents:")
+        #%%
+        for x in directorylist:
+            os.makedirs(x, exist_ok=True)
+            files = os.listdir(x)
+            for file in files:
+                file_path = os.path.join(x, file)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
     #%%
     #num_processes = multiprocessing.cpu_count()  # Number of available CPU cores
     #with multiprocessing.Pool(processes=num_processes) as pool:
     #    printout = pool.starmap(bashpool.testfun, paramtuples)
     #%%
-    print("Create input files:")
+    print("Create input files")
         
     for x,(Rgit, Rinit,R0it, slopeit, inclinationit, posangleit, numpixit), in enumerate(paramtuples):
         with open(filedir+"inputs/input" + str(x), 'w') as file:
