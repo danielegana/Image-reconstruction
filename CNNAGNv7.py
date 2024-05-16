@@ -2,21 +2,18 @@
 
 import torch
 import numpy as np
-import xgboost as xgb
+#import xgboost as xgb
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.data import ConcatDataset
 from torch.utils.data import Subset
-from torchvision import datasets
-from torchvision.transforms import v2
-from torchvision.transforms import ToTensor
+#from torchvision import datasets
+#from torchvision.transforms import v2
+#from torchvision.transforms import ToTensor
 from torch.utils.data import Dataset,random_split
 import matplotlib.pyplot as plt
 from numpy import random
 import torch.nn.functional as F
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import precision_score
-from sklearn.metrics import recall_score
 from sklearn import tree
 from sklearn import ensemble
 import torch.nn.init as init
@@ -31,29 +28,45 @@ from itertools import starmap
 import subprocess
 from helpers import plot
 from itertools import chain
-import bashpool
-from sklearn.multioutput import MultiOutputRegressor
+import bashpoolfull
 
 
 #%%
 
-
 # Test func pool function
 if __name__ == '__main__':
 
-    pythondir="/Users/danielegana/Dropbox (PI)/ML/code/AGN/"
-    filedir="/Users/danielegana/Dropbox (PI)/ML/code/agndisk/agndisk/files/"
-    binarydir="/Users/danielegana/Dropbox (PI)/ML/code/agndisk/agndisk/"
+    clusterrun="false"
+
+    if clusterrun == "false":
+        pythondir="/Users/danielegana/Dropbox (PI)/ML/code/AGN/"
+        filedir="/Users/danielegana/files/"
+        binarydir="/Users/danielegana/Dropbox (PI)/ML/code/agndisk/agndisk/"
+
+    if clusterrun == "true":
+        pythondir="/home/degana/agn"
+        filedir="/home/degana/agn/files/"
+        binarydir="/home/degana/agn"
+
     os.chdir(pythondir)
     #%%
-    lendata=10000
+    lendata=100
     numpix=int(32)
+    numpixarray=[numpix]*lendata
     numparamvis=int(numpix*(numpix/2+1))
-    inclination = np.random.uniform(0, np.pi/2, lendata)
-    R0 = np.random.uniform(6, 100, lendata)
+    Rg= np.random.uniform(1, 10, lendata)
+    Rin=np.random.uniform(Rg, 100, lendata)
+    R0 = np.random.uniform(Rin, 100, lendata)
+    slope = np.random.uniform(1, 5, lendata)
+    Rmax=150
+   # inclination = np.cos(np.random.uniform(0, np.pi/2, lendata))
+   # posangle = np.cos(np.random.uniform(0, 2*np.pi, lendata))
+    inclination = np.random.uniform(0.01, 1, lendata)
+    posangle = np.random.uniform(-1, 1, lendata)
 
-    paramtuples = [tuple(row) for row in np.column_stack((inclination, R0))]
-
+    #%%
+    paramtuples = [tuple(row) for row in np.column_stack((Rg, Rin, R0, slope, inclination, posangle, numpixarray))]
+    selecttuples=[0,1,2,4,5]
     random.shuffle(paramtuples)
     #%%
     intdir="outputint"
@@ -74,19 +87,40 @@ if __name__ == '__main__':
     #with multiprocessing.Pool(processes=num_processes) as pool:
     #    printout = pool.starmap(bashpool.testfun, paramtuples)
     #%%
-    for x,(inclinationit,R0it) in enumerate(paramtuples):
+        
+    for x,(Rgit, Rinit,R0it, slopeit, inclinationit, posangleit, numpixit), in enumerate(paramtuples):
         with open(filedir+"inputs/input" + str(x), 'w') as file:
-        # Write each number to the file. 
-        # Writing order is: inclination, R0, 
-            file.write(str(inclinationit/np.max(inclination))+" "+str(R0it/np.max(R0)) + '\n')
-    
-    #%%
+        # Write each number to input files for net training. 
+        # Writing order is: Rg, Rin, R0, slope, inclination, posangle. This is for the C runner and label retrieving. In bashfun I take the arccos of angles to send to C runner. /np.max(inclination) /np.max(posangle)
+            strintemp=""
+            if bashpoolfull.find_number(selecttuples, 0):
+                strintemp=strintemp+" "+str(Rgit/np.max(Rg))
+            if bashpoolfull.find_number(selecttuples, 1):
+                strintemp=strintemp+" "+str(Rinit/np.max(Rin))
+            if bashpoolfull.find_number(selecttuples, 2):
+                strintemp=strintemp+" "+str(R0it/np.max(R0))
+            if bashpoolfull.find_number(selecttuples, 3):
+                strintemp=strintemp+" "+str(slopeit/np.max(slope))
+            if bashpoolfull.find_number(selecttuples, 4):
+                strintemp=strintemp+" "+str(inclinationit)
+            if bashpoolfull.find_number(selecttuples, 5):
+                strintemp=strintemp+" "+str(posangleit)
+            file.write(strintemp + '\n')
+          #  file.write(str(Rgit/np.max(Rg))+" "+str(Rinit/np.max(Rin))+" "+str(R0it/np.max(R0))+" "+str(slopeit/np.max(slope))+" "+str(inclinationit)+" "+str(posangleit) + '\n')
+         #   file.write(str(Rgit/Rmax)+" "+str(Rinit/Rmax)+" "+str(R0it/Rmax)+" "+str(slopeit)+" "+str(inclinationit)+" "+str(posangleit) + '\n')
+    #
+    tuplelist=list(enumerate(paramtuples))
+    tuplelist= [(tup[0], tup[1], selecttuples) for tup in tuplelist]
+    #%% Run C pool
     num_processes = multiprocessing.cpu_count()  # Number of available CPU cores
     with multiprocessing.Pool(processes=num_processes) as pool:
-        printout = pool.starmap(bashpool.bashfun,list(enumerate(paramtuples)))
+        printout = pool.starmap(bashpoolfull.bashfun,tuplelist)
     #%%
     def imagenumber(imagefile):
         return int(re.findall(r'\d+', imagefile)[0])
+
+    #testimage=np.transpose(np.genfromtxt("/Users/danielegana/files/outputint/intensityfile"))
+    #plt.imshow(testimage)
 
     device = (
     "cuda"
@@ -157,15 +191,15 @@ if __name__ == '__main__':
             self.npixy=int(npixx/2+1)
             filter1=10
             filter2=10
-            kernel1=int(9)
+            kernel1=int(5)
             kernel2=int(3)
            # kernel3=int(3)
             padding1=(kernel1-1)/2
             padding2=(kernel2-1)/2
            # padding3=(kernel3-1)/2
-            layer1size=1000
-            layer2size=1000
-            layer3size=1000
+            layer1size=100
+            layer2size=100
+            layer3size=100
             finalpixelx=int(((npixx-(kernel1-1)+2*padding1)/2-(kernel2-1)+2*padding2)/2)
             finalpixely=int(((npixy-(kernel1-1)+2*padding1)/2-(kernel2-1)+2*padding2)/2)
            # finalpixelx=int(((npixx-(kernel1-1)+2*padding1)/2-(kernel2-1)+2*padding2)/2-(kernel3-1)+2*padding3)
@@ -177,7 +211,7 @@ if __name__ == '__main__':
             self.fc2 = nn.Linear(layer1size,layer2size) 
             self.fc3 = nn.Linear(layer2size,layer3size) 
             self.fc4 = nn.Linear(layer3size,numparams) 
-            self.dropout = nn.Dropout(p=0.2)
+            self.dropout = nn.Dropout(p=0.1)
             self.bn0 = nn.BatchNorm2d(1)
             self.bn1 = nn.BatchNorm2d(filter1)
             self.bn2 = nn.BatchNorm2d(filter2)
@@ -189,7 +223,7 @@ if __name__ == '__main__':
         def forward(self, x):
             # Max pooling over a (2, 2) window
             x=F.pad(x,(0,3),"constant",0)
-            x = F.max_pool2d(F.relu(self.bn1(self.conv1(self.bn0(x)))), (2, 2))
+            x = F.max_pool2d(F.relu(self.bn1(self.conv1(x))), (2, 2))
             x = F.max_pool2d(F.relu(self.bn2(self.conv2(x))), (2, 2))
           #  x = F.relu(self.bn3(self.conv3(x)))
             x = x.view(-1, self.num_flat_features(x))
@@ -267,7 +301,7 @@ if __name__ == '__main__':
     agndataphasereco=getDatasetphasereco(filedir,foldervis=visdir,folderarg=argdir)
 
 #################################################################
-    ##### CNN PARAMETER REGRESSION
+##### Dataset import
     #%% 
     if visflag==1:
         agndata=agndatavis
@@ -284,152 +318,158 @@ if __name__ == '__main__':
     test_images=torch.stack([matrix for matrix in  test_images]).to(device)
     test_labels=torch.stack([matrix for matrix in  test_labels]).to(device)
 
-   
+    #%%
+  #  model = mynet(npixx=numpix,numparams=(len(paramtuples[1])-1),phasereco=False).to(device)
+
+
+#################################################################
+    selectalgorithm="DT" # "CNN" or "CNNPHASE" or "DT"
+#################################################################
+##### CNN PARAMETER REGRESSION
+    if selectalgorithm=="CNN":
     #%% CNN training
-    #model = mynet(npixx=numpix,numparams=2,phasereco=False).to(device)
-    batch_size=100
-    epochs=30
-    learningrate=1e-5
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    loss_fn = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), learningrate)    
-    for t in range(epochs):
-        print(f"Epoch {t+1}\n-------------------------------")
-        train(train_loader, model, loss_fn, optimizer)    
-        print("Done!")
+        model = mynet(npixx=numpix,numparams=(len(selecttuples)),phasereco=False).to(device)
+        batch_size=100
+        epochs=30
+        learningrate=1e-3
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+        loss_fn = nn.MSELoss()
+        optimizer = torch.optim.Adam(model.parameters(), learningrate)    
+        for t in range(epochs):
+            print(f"Epoch {t+1}\n-------------------------------")
+            train(train_loader, model, loss_fn, optimizer)    
+            print("Done!")
 
-  # %% Compute the mse for the test images
-    y_pred = model(test_images)
-    frac_error=model(test_images)/test_labels
-    mse = F.mse_loss(test_labels, y_pred)
-    print("MSE CNN: ",mse)
-    #print("Target labels: ",test_labels)
-    print("Fractional Error: ",frac_error)
+    # %% Compute the mse for the test images
+        y_pred = model(test_images)
+        frac_error=model(test_images)/test_labels
+        mse = F.mse_loss(test_labels, y_pred)
+        mae = mse.sqrt()
+        print("MFRE per feature",np.mean(torch.detach(frac_error.cpu()).numpy(),axis=0))
+        print("MAE CNN: ",mae)
+        print("MSE CNN: ",mse)
+        #print("Target labels: ",test_labels)
+        print("Fractional Error: ",frac_error)
 
-    #%% Benchmark is the average inclination
+        #%% Benchmark is the average inclination
 
-    y_pred =  torch.tensor([0.5,0.5]).unsqueeze(0).repeat(len(test_labels),1).to(device)
-    mse = F.mse_loss(test_labels, y_pred)
-    print("MSE Benchmark: ",mse)
+        y_pred =  torch.tensor([0.5,0.5]).unsqueeze(0).repeat(len(test_labels),1).to(device)
+        mse = F.mse_loss(test_labels, y_pred)
+        print("MSE Benchmark: ",mse)
 
 #################################################################
     #%% 
     #CNN FOR FULL PHASE RECONSTRUCTION
     # Train for pure phase reconstruction
 
-    train_size = int(0.8 * len(agndataphasereco))
-    val_size = len(agndataphasereco) - train_size
+    if selectalgorithm=="CNNphase":
 
-    train_dataset = Subset(agndataphasereco, range(0,train_size))
-    test_dataset = Subset(agndataphasereco, range(train_size,len(agndataphasereco)))
+        train_size = int(0.8 * len(agndataphasereco))
+        val_size = len(agndataphasereco) - train_size
 
-    test_images,test_labels=[x for x, y in test_dataset], [y for x, y in test_dataset]
-    test_images=torch.stack([matrix for matrix in  test_images]).to(device)
-    test_labels=torch.stack([matrix for matrix in  test_labels]).to(device)
-    #%%
-    model = mynet(npixx=numpix,numparams=numparamvis,phasereco=True).to(device)
+        train_dataset = Subset(agndataphasereco, range(0,train_size))
+        test_dataset = Subset(agndataphasereco, range(train_size,len(agndataphasereco)))
 
-    #%% CNN training
-    model = mynet(npixx=numpix,numparams=numparamvis,phasereco=True).to(device)
-    model.train()
-    batch_size=8
-    epochs=1000
-    learningrate=1e-3
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    loss_fn = nn.MSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), learningrate,momentum=0.9)    
-    for t in range(epochs):
-        print(f"Epoch {t+1}\n-------------------------------")
-        train(train_loader, model, loss_fn, optimizer)    
-        print("Done!")
+        test_images,test_labels=[x for x, y in test_dataset], [y for x, y in test_dataset]
+        test_images=torch.stack([matrix for matrix in  test_images]).to(device)
+        test_labels=torch.stack([matrix for matrix in  test_labels]).to(device)
+        #%%
+        model = mynet(npixx=numpix,numparams=numparamvis,phasereco=True).to(device)
 
-    #%%
-    y_pred = model(test_images)
-    frac_error=model(test_images)/test_labels
-    mse = F.mse_loss(test_labels, y_pred)
-    print("MSE CNN: ",mse)
-    #print("Target labels: ",test_labels)
-    print("Fractional Error: ",frac_error)
+        #%% CNN training
+        model = mynet(npixx=numpix,numparams=numparamvis,phasereco=True).to(device)
+        model.train()
+        batch_size=100
+        epochs=10
+        learningrate=1e-4
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+        loss_fn = nn.MSELoss()
+        optimizer = torch.optim.SGD(model.parameters(), learningrate,momentum=0.9)    
+        for t in range(epochs):
+            print(f"Epoch {t+1}\n-------------------------------")
+            train(train_loader, model, loss_fn, optimizer)    
+            print("Done!")
 
-    #model(agndatavis[0][0].unsqueeze(0))[0].cpu().detach().numpy()
-    #%%
-    # Getting the image from the phase and the visibility
-    
-    def getimage(agndatavis,idx,npix):
-        model.eval()
-        phase=model(agndatavis[idx][0].unsqueeze(0))[0].cpu().detach().numpy()
-        amp=np.sqrt(agndatavis[idx][0][0].cpu().numpy())
-        complex=amp*np.exp(1j * phase)
-        return np.fft.irfft2(complex)
-    
-    def getdummyimage(agndatavis,idx,npix):
-        model.eval()
-        amp=np.sqrt(agndatavis[idx][0][0].cpu().numpy())
-        return np.fft.irfft2(amp)
-    
-    #%% Test image reco
-    plt.subplot(1, 3, 1)
-    plt.imshow(agndataint[0][0][0].cpu())
-    plt.title("Original")
-    plt.subplot(1, 3, 2)
-    plt.imshow(getdummyimage(agndatavis,0,numpix))
-    plt.title("Dummy zero phase")
-    plt.subplot(1, 3, 3)
-    plt.imshow(getimage(agndatavis,0,numpix))
-    plt.title("Reconstructed")
+        #%%
+        y_pred = model(test_images)
+        frac_error=model(test_images)/test_labels
+        mse = F.mse_loss(test_labels, y_pred)
+        print("MSE CNN: ",mse)
+        #print("Target labels: ",test_labels)
+        print("Fractional Error: ",frac_error)
+
+        #model(agndatavis[0][0].unsqueeze(0))[0].cpu().detach().numpy()
+        #%%
+        # Getting the image from the phase and the visibility
+        
+        def getimage(agndatavis,idx,npix):
+            model.eval()
+            phase=model(agndatavis[idx][0].unsqueeze(0))[0].cpu().detach().numpy()
+            amp=np.sqrt(agndatavis[idx][0][0].cpu().numpy())
+            complex=amp*np.exp(1j * phase)
+            return np.fft.irfft2(complex)
+        
+        def getdummyimage(agndatavis,idx,npix):
+            model.eval()
+            amp=np.sqrt(agndatavis[idx][0][0].cpu().numpy())
+            return np.fft.irfft2(amp)
+        
+        #%% Test image reco
+        plt.subplot(1, 3, 1)
+        plt.imshow(agndataint[0][0][0].cpu())
+        plt.title("Original")
+        plt.subplot(1, 3, 2)
+        plt.imshow(getdummyimage(agndatavis,0,numpix))
+        plt.title("Dummy zero phase")
+        plt.subplot(1, 3, 3)
+        plt.imshow(getimage(agndatavis,0,numpix))
+        plt.title("Reconstructed")
 
 
 
 #################################################################
     #%%
     #%% Data preparation for DT
-    train_imagesDT,train_labelsDT=[torch.squeeze(x.view(x.size(1)*x.size(2), -1),1) for x, y in train_dataset], [y for x, y in train_dataset]
-    train_imagesDT=torch.stack([matrix for matrix in  train_imagesDT]).cpu().numpy()
-    train_labelsDT=torch.stack([matrix for matrix in  train_labelsDT]).cpu().numpy()
 
-    #train_imagesDT=np.stack(train_imagesDT)
-    #train_labelsDT=np.stack(train_labelsDT)
+    if selectalgorithm=="DT":
+    
+        train_imagesDT,train_labelsDT=[torch.squeeze(x.view(x.size(1)*x.size(2), -1),1) for x, y in train_dataset], [y for x, y in train_dataset]
+        train_imagesDT=torch.stack([matrix for matrix in  train_imagesDT]).cpu().numpy()
+        train_labelsDT=torch.stack([matrix for matrix in  train_labelsDT]).cpu().numpy()
 
-    #%%
-    test_imagesDT,test_labelsDT=[torch.squeeze(x.view(x.size(1)*x.size(2), -1),1) for x, y in test_dataset], [y for x, y in test_dataset]
-    test_imagesDT=torch.stack([matrix for matrix in  test_imagesDT]).cpu().numpy()
-    test_labelsDT=torch.stack([matrix for matrix in  test_labelsDT]).cpu().numpy()
-    #test_imagesDT,test_labelsDT=[torch.squeeze(x.view(x.size(1)*x.size(2), -1),1).numpy() for x, y in test_dataset], [y for x, y in test_dataset]
-    #test_imagesDT=np.stack(test_imagesDT)
-    #test_labelsDT=np.stack(test_labelsDT)
+        #train_imagesDT=np.stack(train_imagesDT)
+        #train_labelsDT=np.stack(train_labelsDT)
 
-    ### A DT
-    # %%
-    modelDT=ensemble.RandomForestRegressor()
-    #modelDT=ensemble.BaggingRegressor()
+        #%%
+        test_imagesDT,test_labelsDT=[torch.squeeze(x.view(x.size(1)*x.size(2), -1),1) for x, y in test_dataset], [y for x, y in test_dataset]
+        test_imagesDT=torch.stack([matrix for matrix in  test_imagesDT]).cpu().numpy()
+        test_labelsDT=torch.stack([matrix for matrix in  test_labelsDT]).cpu().numpy()
+        #test_imagesDT,test_labelsDT=[torch.squeeze(x.view(x.size(1)*x.size(2), -1),1).numpy() for x, y in test_dataset], [y for x, y in test_dataset]
+        #test_imagesDT=np.stack(test_imagesDT)
+        #test_labelsDT=np.stack(test_labelsDT)
+
+        ### A DT
+        # %%
+        modelDT=ensemble.RandomForestRegressor()
+        #modelDT=ensemble.BaggingRegressor()
+    # modelDT=tree.DecisionTreeRegressor(min_samples_split=10,min_samples_leaf=10)
 
 
-    modelDT.fit(train_imagesDT,train_labelsDT)
+        modelDT.fit(train_imagesDT,train_labelsDT)
 
- 
-    # %% Now compute the mse for the test images
-    y_pred = modelDT.predict(test_imagesDT)
-    frac_error=np.divide(modelDT.predict(test_imagesDT),test_labelsDT)
-    mse = mean_squared_error(test_labelsDT, y_pred)
-    print("MSE DT: ",mse)
-    #print("Target labels: ",test_labels)
-    print("Fractional Error: ",frac_error)
+    
+        # %% Now compute the mse for the test images
+        y_pred = modelDT.predict(test_imagesDT)
+        frac_error=np.divide(modelDT.predict(test_imagesDT),test_labelsDT)
+        mse = mean_squared_error(test_labelsDT, y_pred)
+        mae = np.sqrt(mean_squared_error(test_labelsDT, y_pred))
+        print("MFRE per feature",np.mean(frac_error, axis=0))
+        print("MSE DT: ",mse)
+        print("MAE DT: ",mae)
 
-    # %%
+        #print("Target labels: ",test_labels)
+        print("Fractional Error: ",frac_error)
 
-    ### PLOTS
-    # %%
-    plt.figure(figsize=(20, 15))
-    plt.imshow(agndatavis[0][0][0].cpu()[0:10,0:10])
-    plt.figure(figsize=(20, 15))
-    plt.imshow(agndataint[0][0])
 
-    # %%
-    plt.imshow(agndataint[0][0])
-    # %%
-    plt.figure(figsize=(20, 15))
-    plt.imshow(agndata[0][0][0:10,0:10])
-
-    # %%
