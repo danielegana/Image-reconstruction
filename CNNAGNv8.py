@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     print("Defining parameters")
 
-    lendata=100
+    lendata=2000
     numpix=int(32)
     numpixarray=[numpix]*lendata
     numparamvis=int(numpix*(numpix/2+1))
@@ -64,14 +64,14 @@ if __name__ == '__main__':
     R0 = np.random.uniform(Rin, 100, lendata)
     slope = np.random.uniform(1, 5, lendata)
     Rmax=150
-   # inclination = np.cos(np.random.uniform(0, np.pi/2, lendata))
-   # posangle = np.cos(np.random.uniform(0, 2*np.pi, lendata))
     inclination = np.random.uniform(0.01, 1, lendata)
     posangle = np.random.uniform(-1, 1, lendata)
+    noiselevel=0
+    randomseed=np.random.randint(0,1e9,lendata)
 
     #%%
-    paramtuples = [tuple(row) for row in np.column_stack((Rg, Rin, R0, slope, inclination, posangle, numpixarray))]
-    selecttuples=[0,1,2,3,4,5]
+    paramtuples = [tuple(row) for row in np.column_stack((Rg, Rin, R0, slope, inclination, posangle, numpixarray, randomseed))]
+    selecttuples=[0,1]
     random.shuffle(paramtuples)
     #%%
     intdir="outputint"
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     #%%
     print("Create input files")
         
-    for x,(Rgit, Rinit,R0it, slopeit, inclinationit, posangleit, numpixit), in enumerate(paramtuples):
+    for x,(Rgit, Rinit,R0it, slopeit, inclinationit, posangleit, numpixit, randomit), in enumerate(paramtuples):
         with open(filedir+"inputs/input" + str(x), 'w') as file:
         # Write each number to input files for net training. 
         # Writing order is: Rg, Rin, R0, slope, inclination, posangle. This is for the C runner and label retrieving. In bashfun I take the arccos of angles to send to C runner. /np.max(inclination) /np.max(posangle)
@@ -123,7 +123,7 @@ if __name__ == '__main__':
          #   file.write(str(Rgit/Rmax)+" "+str(Rinit/Rmax)+" "+str(R0it/Rmax)+" "+str(slopeit)+" "+str(inclinationit)+" "+str(posangleit) + '\n')
     #
     tuplelist=list(enumerate(paramtuples))
-    tuplelist= [(tup[0], tup[1], selecttuples, clusterc) for tup in tuplelist]
+    tuplelist= [(tup[0], tup[1], selecttuples, clusterc, noiselevel) for tup in tuplelist]
     #%% Run C pool
 
     num_processes = multiprocessing.cpu_count()  # Number of available CPU cores
@@ -161,6 +161,7 @@ if __name__ == '__main__':
         def __getitem__(self, idx):
             image_name = os.path.join(self.root_dir,self.folder ,self.images[idx])
             image = np.genfromtxt(image_name,delimiter=" ")
+          #  image=image+[[random.uniform(-noiselevel, noiselevel) for _ in range(image.shape[1])] for _ in range(range(image.shape[0]))]
             param_name=os.path.join(self.root_dir,"inputs" , self.params[idx])
             params = np.genfromtxt(param_name,delimiter=" ")
             # Convert image to tensor and normalize
@@ -474,9 +475,9 @@ if __name__ == '__main__':
         # %%
         print("Fitting DT")
 
-        modelDT=ensemble.RandomForestRegressor(n_jobs=-1)
+        #modelDT=ensemble.RandomForestRegressor(n_jobs=-1)
         #modelDT=ensemble.BaggingRegressor()
-    # modelDT=tree.DecisionTreeRegressor(min_samples_split=10,min_samples_leaf=10)
+        modelDT=tree.DecisionTreeRegressor()
 
         start_time = time.time()
         modelDT.fit(train_imagesDT,train_labelsDT)
@@ -494,7 +495,7 @@ if __name__ == '__main__':
         print("MAE DT: ",mae)
 
         #print("Target labels: ",test_labels)
-        print("Fractional Error: ",frac_error)
+       # print("Fractional Error: ",frac_error)
 
         joblib.dump(modelDT, 'modelDT.joblib')
 
