@@ -25,6 +25,8 @@ import subprocess
 from itertools import chain
 import bashpoolfull
 import time
+import joblib
+
 
 
 #%%
@@ -32,7 +34,7 @@ import time
 # Test func pool function
 if __name__ == '__main__':
 
-    clusterrun="True"
+    clusterrun="false"
 
     if clusterrun == "false":
         pythondir="/Users/danielegana/Dropbox (PI)/ML/code/AGN/"
@@ -51,7 +53,7 @@ if __name__ == '__main__':
 
     print("Defining parameters")
 
-    lendata=50000
+    lendata=1000
     numpix=int(32)
     numpixarray=[numpix]*lendata
     numparamvis=int(numpix*(numpix/2+1))
@@ -81,7 +83,7 @@ if __name__ == '__main__':
             os.makedirs(x, exist_ok=True)
     
     if clusterrun == "false":
-        print("Erasing folder contents:")
+        print("Erasing folder contents")
         #%%
         for x in directorylist:
         #    os.makedirs(x, exist_ok=True)
@@ -335,7 +337,9 @@ if __name__ == '__main__':
 
 
 #################################################################
+
     selectalgorithm="DT" # "CNN" or "CNNPHASE" or "DT"
+    #%%
 #################################################################
 ##### CNN PARAMETER REGRESSION
     if selectalgorithm=="CNN":
@@ -446,7 +450,9 @@ if __name__ == '__main__':
     #%% Data preparation for DT
 
     if selectalgorithm=="DT":
-    
+        print("Preparing arrays for DT")
+
+        #%%
         train_imagesDT,train_labelsDT=[torch.squeeze(x.view(x.size(1)*x.size(2), -1),1) for x, y in train_dataset], [y for x, y in train_dataset]
         train_imagesDT=torch.stack([matrix for matrix in  train_imagesDT]).cpu().numpy()
         train_labelsDT=torch.stack([matrix for matrix in  train_labelsDT]).cpu().numpy()
@@ -464,6 +470,8 @@ if __name__ == '__main__':
 
         ### A DT
         # %%
+        print("Fitting DT")
+
         modelDT=ensemble.RandomForestRegressor(n_jobs=-1)
         #modelDT=ensemble.BaggingRegressor()
     # modelDT=tree.DecisionTreeRegressor(min_samples_split=10,min_samples_leaf=10)
@@ -485,5 +493,7 @@ if __name__ == '__main__':
 
         #print("Target labels: ",test_labels)
         print("Fractional Error: ",frac_error)
+
+        joblib.dump(modelDT, 'modelDT.joblib')
 
 

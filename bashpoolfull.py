@@ -34,3 +34,7 @@ def bashfun(run,tuple,selecttuples):
        # print(bashcommand)
         os.system(bashcommand)
         return run
+        
+def process_data(data):
+    x, y = data
+    return torch.squeeze(x.view(x.size(1) * x.size(2), -1), 1), y
