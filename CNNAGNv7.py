@@ -2,14 +2,10 @@
 
 import torch
 import numpy as np
-#import xgboost as xgb
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.data import ConcatDataset
 from torch.utils.data import Subset
-#from torchvision import datasets
-#from torchvision.transforms import v2
-#from torchvision.transforms import ToTensor
 from torch.utils.data import Dataset,random_split
 import matplotlib.pyplot as plt
 from numpy import random
@@ -44,7 +40,7 @@ if __name__ == '__main__':
         binarydir="/Users/danielegana/Dropbox (PI)/ML/code/agndisk/agndisk/"
 
     if clusterrun == "true":
-        pythondir="/home/degana/agn"
+        pythondir="/home/degana/agn/AGN"
         filedir="/home/degana/agn/files/"
         binarydir="/home/degana/agn"
 
