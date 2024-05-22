@@ -4,6 +4,5 @@ This is a python/pytorch code to perform image reconstruction of distant black h
 
 It can reconstruct the black hole parameters using Decision Trees, Random Forests or CNNs. It can also perform full parameter-agnostic image reconstruction using CNNs, starting from just the magnitude of the Fourier Transform.
 
-CNNAGNvx has the main code. It calls main.c, a third-party AGN code (credit: Neal Dalal) to generate the AGN images, 
-that I modified for python and cluster integration.
+CNNAGNvx has the main code. CNNAGN requires input images for training. Here we generate the input images calling a third-party code main.c (credit: Neal Dalal), that I modified for python and cluster integration.
 
