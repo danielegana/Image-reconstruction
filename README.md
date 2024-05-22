@@ -6,3 +6,5 @@ It can reconstruct the black hole parameters using Decision Trees, Random Forest
 
 CNNAGNvx has the main code. CNNAGN requires input images for training. Here we generate the input images calling a third-party code main.c (credit: Neal Dalal), that I modified for python and cluster integration.
 
+Earlier versions of the code used as an external function bashpool or bashpoolfull to call main.c. In the latest version of the code bashpool is integrated into CNNAGN.
+
