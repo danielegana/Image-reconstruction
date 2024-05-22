@@ -1,5 +1,8 @@
 #%%
 
+#### CHECK WHY FOR FORWARD MODELING THE PREDICTIONS ARE SO BAD. I think I'm not training on the right things.
+
+## I think is working reasonably it's just that since here i'm predicting just one parameter, the fractional error is not averaged down to 1. 
 import torch
 import numpy as np
 from torch import nn
@@ -23,10 +26,36 @@ from multiprocessing import Process
 from itertools import starmap
 import subprocess
 from itertools import chain
-import bashpoolfull
 import time
 import joblib
 
+def find_number(arr, target):
+    return target in arr
+
+def bashfun(run,tuple,Rmaxin,numpix,selecttuples,clusterc,noise):
+        Rgit=tuple[0]
+        Rinit=tuple[1]
+        R0it=tuple[2]
+        slopeit=tuple[3]
+        inclinationit=tuple[4]
+        posangleit=tuple[5]
+        seed=int(tuple[6])
+        bashcommand="./ssdisk"+" -run "+str(run)+" -Rmax "+str(Rmaxin)+" -np "+str(numpix)+" -cluster "+str(int(clusterc))+" -noise "+str(noise)+" -seed "+str(seed)
+        if find_number(selecttuples, 0):
+            bashcommand=bashcommand+" -Rg "+str(Rgit)
+        if find_number(selecttuples, 1):
+            bashcommand=bashcommand+" -Rin "+str(Rinit)
+        if find_number(selecttuples, 2):
+            bashcommand=bashcommand+" -R0 "+str(R0it)
+        if find_number(selecttuples, 3):
+            bashcommand=bashcommand+" -n "+str(slopeit)
+        if find_number(selecttuples, 4):
+            bashcommand=bashcommand+" -i "+str(np.arccos(inclinationit))
+        if find_number(selecttuples, 5):
+            bashcommand=bashcommand+" -phi "+str(np.arccos(posangleit))
+     #   print(bashcommand)
+        os.system(bashcommand)
+        return run
 
 
 #%%
@@ -35,6 +64,8 @@ import joblib
 if __name__ == '__main__':
 
     clusterrun="false"
+    fmodel="true"
+
 
     if clusterrun == "false":
         clusterc=int(0)
@@ -55,24 +86,48 @@ if __name__ == '__main__':
 
     print("Defining parameters")
 
-    lendata=2000
-    numpix=int(32)
-    numpixarray=[numpix]*lendata
+    lendata=5000
+    numpix=int(128)
     numparamvis=int(numpix*(numpix/2+1))
+    Rmax=150
+
+
+    # These are the 7 param tuples
     Rg= np.random.uniform(1, 10, lendata)
     Rin=np.random.uniform(Rg, 100, lendata)
     R0 = np.random.uniform(Rin, 100, lendata)
     slope = np.random.uniform(1, 5, lendata)
-    Rmax=150
     inclination = np.random.uniform(0.01, 1, lendata)
     posangle = np.random.uniform(-1, 1, lendata)
-    noiselevel=0
     randomseed=np.random.randint(0,1e9,lendata)
 
+    noiselevel=0.001
+    train_size = int(0.8 * lendata)
+    val_size = lendata - train_size
+
     #%%
-    paramtuples = [tuple(row) for row in np.column_stack((Rg, Rin, R0, slope, inclination, posangle, numpixarray, randomseed))]
-    selecttuples=[0,1]
+    #Define BH parameter tuples
+    paramtuples = [tuple(row) for row in np.column_stack((Rg, Rin, R0, slope, inclination, posangle, randomseed))]
+    selecttuples=[1,2]
     random.shuffle(paramtuples)
+    #%%
+    # To test forward modeling I fix the BH parameters in the test dataset to a set value.
+    if fmodel == "true":
+        Rgfm= 1
+        Rinfm= 10
+        R0fm = 70
+        slop0fme = 3
+        inclinationfm = 1
+        posanglefm =  1
+        paramtuples= [tup if idx<train_size  else (Rgfm, Rinfm, R0fm, slop0fme, inclinationfm, posanglefm, tup[6]) for idx,tup in enumerate(paramtuples)]
+
+    #%%
+
+    Rgmax=np.max([x for x, y, z, w, v, p, s in paramtuples])
+    Rinmax=np.max([y for x, y, z, w, v, p, s in paramtuples])
+    R0max=np.max([z for x, y, z, w, v, p, s in paramtuples])
+    slopemax=np.max([w for x, y, z, w, v, p, s in paramtuples])
+    
     #%%
     intdir="outputint"
     visdir="outputvis"
@@ -94,49 +149,44 @@ if __name__ == '__main__':
                 file_path = os.path.join(x, file)
                 if os.path.isfile(file_path):
                     os.remove(file_path)
-    #%%
-    #num_processes = multiprocessing.cpu_count()  # Number of available CPU cores
-    #with multiprocessing.Pool(processes=num_processes) as pool:
-    #    printout = pool.starmap(bashpool.testfun, paramtuples)
+
     #%%
     print("Create input files")
-        
-    for x,(Rgit, Rinit,R0it, slopeit, inclinationit, posangleit, numpixit, randomit), in enumerate(paramtuples):
+    for x,(Rgit, Rinit,R0it, slopeit, inclinationit, posangleit, randomseedit), in enumerate(paramtuples):
         with open(filedir+"inputs/input" + str(x), 'w') as file:
         # Write each number to input files for net training. 
         # Writing order is: Rg, Rin, R0, slope, inclination, posangle. This is for the C runner and label retrieving. In bashfun I take the arccos of angles to send to C runner. /np.max(inclination) /np.max(posangle)
             strintemp=""
-            if bashpoolfull.find_number(selecttuples, 0):
-                strintemp=strintemp+" "+str(Rgit/np.max(Rg))
-            if bashpoolfull.find_number(selecttuples, 1):
-                strintemp=strintemp+" "+str(Rinit/np.max(Rin))
-            if bashpoolfull.find_number(selecttuples, 2):
-                strintemp=strintemp+" "+str(R0it/np.max(R0))
-            if bashpoolfull.find_number(selecttuples, 3):
-                strintemp=strintemp+" "+str(slopeit/np.max(slope))
-            if bashpoolfull.find_number(selecttuples, 4):
+            if find_number(selecttuples, 0):
+                strintemp=strintemp+" "+str(Rgit/Rgmax)
+            if find_number(selecttuples, 1):
+                strintemp=strintemp+" "+str(Rinit/Rinmax)
+            if find_number(selecttuples, 2):
+                strintemp=strintemp+" "+str(R0it/R0max)
+            if find_number(selecttuples, 3):
+                strintemp=strintemp+" "+str(slopeit/slopemax)
+            if find_number(selecttuples, 4):
                 strintemp=strintemp+" "+str(inclinationit)
-            if bashpoolfull.find_number(selecttuples, 5):
+            if find_number(selecttuples, 5):
                 strintemp=strintemp+" "+str(posangleit)
             file.write(strintemp + '\n')
-          #  file.write(str(Rgit/np.max(Rg))+" "+str(Rinit/np.max(Rin))+" "+str(R0it/np.max(R0))+" "+str(slopeit/np.max(slope))+" "+str(inclinationit)+" "+str(posangleit) + '\n')
-         #   file.write(str(Rgit/Rmax)+" "+str(Rinit/Rmax)+" "+str(R0it/Rmax)+" "+str(slopeit)+" "+str(inclinationit)+" "+str(posangleit) + '\n')
-    #
+    #%%
+    # Augment the paramtuples list with the npix, selecttuples, cluster flag, and noise level. 
+    # I only add noise to the test dataset.
     tuplelist=list(enumerate(paramtuples))
-    tuplelist= [(tup[0], tup[1], selecttuples, clusterc, noiselevel) for tup in tuplelist]
-    #%% Run C pool
+   # tuplelist= [(tup[0], tup[1], Rmax, numpix, selecttuples, clusterc,  0 if tup[0]<train_size  else noiselevel) for tup in tuplelist]
+    tuplelist= [(tup[0], tup[1], Rmax, numpix, selecttuples, clusterc,  noiselevel if tup[0]<train_size  else noiselevel) for tup in tuplelist]
 
+    
+    #%% Run C pool
     num_processes = multiprocessing.cpu_count()  # Number of available CPU cores
     print("Start C pool on "+str(num_processes)+" cores")
 
     with multiprocessing.Pool(processes=num_processes) as pool:
-        printout = pool.starmap(bashpoolfull.bashfun,tuplelist)
+        printout = pool.starmap(bashfun,tuplelist)
     #%%
     def imagenumber(imagefile):
         return int(re.findall(r'\d+', imagefile)[0])
-
-    #testimage=np.transpose(np.genfromtxt("/Users/danielegana/files/outputint/intensityfile"))
-    #plt.imshow(testimage)
 
     device = (
     "cuda"
@@ -325,18 +375,12 @@ if __name__ == '__main__':
     else:
         agndata=agndataint
 
-    train_size = int(0.8 * len(agndata))
-    val_size = len(agndata) - train_size
-
     train_dataset = Subset(agndata, range(0,train_size))
     test_dataset = Subset(agndata, range(train_size,len(agndata)))
 
     test_images,test_labels=[x for x, y in test_dataset], [y for x, y in test_dataset]
     test_images=torch.stack([matrix for matrix in  test_images]).to(device)
     test_labels=torch.stack([matrix for matrix in  test_labels]).to(device)
-
-    #%%
-  #  model = mynet(npixx=numpix,numparams=(len(paramtuples[1])-1),phasereco=False).to(device)
 
 
 #################################################################
@@ -475,9 +519,9 @@ if __name__ == '__main__':
         # %%
         print("Fitting DT")
 
-        #modelDT=ensemble.RandomForestRegressor(n_jobs=-1)
+        modelDT=ensemble.RandomForestRegressor(n_jobs=-1)
         #modelDT=ensemble.BaggingRegressor()
-        modelDT=tree.DecisionTreeRegressor()
+       # modelDT=tree.DecisionTreeRegressor()
 
         start_time = time.time()
         modelDT.fit(train_imagesDT,train_labelsDT)
@@ -486,6 +530,8 @@ if __name__ == '__main__':
 
     
         # %% Now compute the mse for the test images
+        # If I don't add noise for FW runs, then y_pred is the same for all test images, as all test images are exactly equal.
+
         y_pred = modelDT.predict(test_imagesDT)
         frac_error=np.divide(modelDT.predict(test_imagesDT),test_labelsDT)
         mse = mean_squared_error(test_labelsDT, y_pred)
@@ -499,4 +545,19 @@ if __name__ == '__main__':
 
         joblib.dump(modelDT, 'modelDT.joblib')
 
+        #%%
+        Rinpredarray=[x*Rinmax for x,y in y_pred]
+        R0predarray=[y*R0max for x,y in y_pred]
+        
+        #%%
+        plt.subplot(1, 2, 1)
+        plt.hist(Rinpredarray,100)
+        plt.subplot(1, 2, 2)
+        plt.hist(R0predarray,bins=100)
+        plt.show()
 
+        #%%
+
+
+
+# %%
