@@ -1,8 +1,5 @@
 #%%
 
-#### CHECK WHY FOR FORWARD MODELING THE PREDICTIONS ARE SO BAD. I think I'm not training on the right things.
-
-## I think is working reasonably it's just that since here i'm predicting just one parameter, the fractional error is not averaged down to 1. 
 import torch
 import numpy as np
 from torch import nn
@@ -63,6 +60,7 @@ def bashfun(run,tuple,Rmaxin,numpix,selecttuples,clusterc,noise):
 # Test func pool function
 if __name__ == '__main__':
 
+    # Flags for running in the cluster, and for forward modeling of the AGN, as opposed to just testint the algorithm against random test data.
     clusterrun="false"
     fmodel="true"
 
@@ -91,8 +89,7 @@ if __name__ == '__main__':
     numparamvis=int(numpix*(numpix/2+1))
     Rmax=150
 
-
-    # These are the 7 param tuples
+    # These are the 7 param tuples. In addition to the BH params, we have a random seed for different runs.
     Rg= np.random.uniform(1, 10, lendata)
     Rin=np.random.uniform(Rg, 100, lendata)
     R0 = np.random.uniform(Rin, 100, lendata)
@@ -101,6 +98,8 @@ if __name__ == '__main__':
     posangle = np.random.uniform(-1, 1, lendata)
     randomseed=np.random.randint(0,1e9,lendata)
 
+
+    # Noise level measured wtr to the lowest k-mode. I.e., noiselevel is 1/SNR.
     noiselevel=0.001
     train_size = int(0.8 * lendata)
     val_size = lendata - train_size
@@ -110,8 +109,9 @@ if __name__ == '__main__':
     paramtuples = [tuple(row) for row in np.column_stack((Rg, Rin, R0, slope, inclination, posangle, randomseed))]
     selecttuples=[1,2]
     random.shuffle(paramtuples)
+
     #%%
-    # To test forward modeling I fix the BH parameters in the test dataset to a set value.
+    # For AGN forward modeling I fix the BH parameters in the test dataset to a set value.
     if fmodel == "true":
         Rgfm= 1
         Rinfm= 10
@@ -122,7 +122,6 @@ if __name__ == '__main__':
         paramtuples= [tup if idx<train_size  else (Rgfm, Rinfm, R0fm, slop0fme, inclinationfm, posanglefm, tup[6]) for idx,tup in enumerate(paramtuples)]
 
     #%%
-
     Rgmax=np.max([x for x, y, z, w, v, p, s in paramtuples])
     Rinmax=np.max([y for x, y, z, w, v, p, s in paramtuples])
     R0max=np.max([z for x, y, z, w, v, p, s in paramtuples])
@@ -170,9 +169,10 @@ if __name__ == '__main__':
             if find_number(selecttuples, 5):
                 strintemp=strintemp+" "+str(posangleit)
             file.write(strintemp + '\n')
+    
     #%%
     # Augment the paramtuples list with the npix, selecttuples, cluster flag, and noise level. 
-    # I only add noise to the test dataset.
+    # To add only noise to test dataset uncomment line below and comment the following one.
     tuplelist=list(enumerate(paramtuples))
    # tuplelist= [(tup[0], tup[1], Rmax, numpix, selecttuples, clusterc,  0 if tup[0]<train_size  else noiselevel) for tup in tuplelist]
     tuplelist= [(tup[0], tup[1], Rmax, numpix, selecttuples, clusterc,  noiselevel if tup[0]<train_size  else noiselevel) for tup in tuplelist]
@@ -385,7 +385,7 @@ if __name__ == '__main__':
 
 #################################################################
 
-    selectalgorithm="DT" # "CNN" or "CNNPHASE" or "DT"
+    selectalgorithm="DT" # "CNN", "CNNPHASE" or "DT"
     #%%
 #################################################################
 ##### CNN PARAMETER REGRESSION
@@ -479,9 +479,9 @@ if __name__ == '__main__':
             amp=np.sqrt(agndatavis[idx][0][0].cpu().numpy())
             return np.fft.irfft2(amp)
         
-        #%% Test image reco
+        #%% Test image reco. Note I'm testing against training data only. 
         plt.subplot(1, 3, 1)
-        plt.imshow(agndataint[0][0][0].cpu())
+        plt.imshow(agndataint[0][0][0].cpu()) 
         plt.title("Original")
         plt.subplot(1, 3, 2)
         plt.imshow(getdummyimage(agndatavis,0,numpix))
@@ -493,7 +493,7 @@ if __name__ == '__main__':
 
 
 #################################################################
-    #%%
+    #%% DECISION TREES AND RANDOM FORESTS
     #%% Data preparation for DT
 
     if selectalgorithm=="DT":
@@ -550,6 +550,7 @@ if __name__ == '__main__':
         R0predarray=[y*R0max for x,y in y_pred]
         
         #%%
+        # Plot distribution of predicted Radii, for the case of Rin and R0 forward modeling.
         plt.subplot(1, 2, 1)
         plt.hist(Rinpredarray,100)
         plt.subplot(1, 2, 2)
