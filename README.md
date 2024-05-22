@@ -1,4 +1,4 @@
-Daniel Egaña-Ugrinovic, May 2024.
+Daniel Egaña-Ugrinovic, 2024.
 
 This is a python/pytorch code to perform image reconstruction of distant black holes taking as input simulated intensity-interferometry measurements (magnitude of the image's Fourier transform).
 
